@@ -1,3 +1,10 @@
+/****************************************/
+/* Name: control_fp.cpp */
+/* Function:  Evaluate data from subscribed nodes */
+/* Author: Heidi Stamm */
+/* Last update: 16.01.2015 */
+/****************************************/
+
 #include "control_fp.h"
 
 control_fp::control_fp()
@@ -20,7 +27,7 @@ void control_fp::front_laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg
   val_front[0] = val_front[1];                                // store the penultimate mean value  
   val_front[1] = val_front[2];                                // store the last mean value
   
-  /* Calculate the mean value of the first five sensor values on the left side of the car: For the front laser scanner index 719 holds the most left 
+  /* Calculate the mean value of the first five sensor values on the left side of the car: For the front laser scanner index 719 holds the leftmost
   sensor reading. This mean value represents the distance between the car and the wall or other parking objects.*/
   
   for (int i = 0; i < 5; i++)
@@ -82,7 +89,7 @@ void control_fp::front_laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg
     /* Calculate a local minimum on the left side of the car. This local minimum represents the angle between the side of the first box to the first 
     front edge of the second box. With the knowledge about this angle and the cars distance to the first box, the distance between the two boxes can 
     be calculated. 
-    As there are perturbations for the first few degrees the search starts with a minimum angle of 13° and it breaks if the difference between two 
+    As there are perturbations for the first few degrees the search starts by a minimum angle of 13° and it breaks if the difference between two 
     neighbouring sensor readings is larger than 20 cm. */
     for (int k = 12; k < 86; k++)
     {
@@ -112,7 +119,7 @@ void control_fp::back_laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
   val_back[0] = val_back[1];                                // store the penultimate mean value
   val_back[1] = val_back[2];                                // store the last mean value
   
-  /* Calculate the mean value of the first five sensor values on the left side of the car: For the back laser scanner index 0 holds the most left 
+  /* Calculate the mean value of the first five sensor values on the left side of the car: For the back laser scanner index 0 holds the leftmost
   sensor reading. This mean value represents the distance between the car and the wall or other parking objects.*/
   
   for (int i = 0; i < 5; i++)
@@ -131,7 +138,7 @@ void control_fp::back_laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
  
 }
 
-// function to get the actual robot y position 
+// function to get the current robot y position 
 void control_fp::robot_positionCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& msg)
 {
   rob_pos_y = msg->pose.pose.position.y;

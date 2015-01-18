@@ -1,3 +1,10 @@
+/****************************************/
+/* Name: control_fp.h */
+/* Function: declare functions and variables */
+/* Author: Heidi Stamm */
+/* Last update: 16.01.2015 */
+/****************************************/
+
 #ifndef CONTROL_H
 #define CONTROL_H
 #include "ros/ros.h"

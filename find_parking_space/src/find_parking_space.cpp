@@ -1,3 +1,10 @@
+/****************************************/
+/* Name: find_parking_space.cpp */
+/* Function: Find a parking space and place the car besides the second box/parking object */
+/* Author: Heidi Stamm */
+/* Last update: 16.01.2015 */
+/****************************************/
+
 # include "control/control_fp.h"
 
 
