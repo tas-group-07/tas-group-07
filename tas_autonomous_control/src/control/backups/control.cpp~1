@@ -1,5 +1,3 @@
-// Andreas Pfeuffer & Fabian Sonntag
-
 #include "control.h"
 
 control::control()
@@ -13,7 +11,7 @@ control::control()
     wii_communication_sub = nh_.subscribe<std_msgs::Int16MultiArray>("wii_communication",1000,&control::wiiCommunicationCallback,this);
 
     sensor_sub = nh_.subscribe<sensor_msgs::LaserScan>("/scan", 1000, &control::LaserScan_Velocity_Calculation,this); // FS
-
+	
 	enable_driving_sub = nh_.subscribe<std_msgs::Float32>("enable_driving",1000,&control::enable_drivingCallback,this); // AP
 
 	enable_driving = 0.0; // AP
@@ -91,27 +89,30 @@ void control::LaserScan_Velocity_Calculation(const sensor_msgs::LaserScan::Const
     double min_range_core = 5;
     double min_range_sides = 5;
     double min_range = 0;
-    int msg_mid_index = 360;			//90 deg Index of Laser Scan Message
+    int msg_mid_index = 360;
     int index_angle_delta_side = 720/180 * 25;	//Area to be considered: -25deg to 25deg
-    int index_angle_delta_core = 720/180 * 15;	//Core Area to be considered: -15deg to 15deg
-    int max_vel_value = 1580;			//Maximum Velocity Value that can be computed by function
+    int index_angle_delta_core = 720/180 * 15;	//Core Area to be considered: -10deg to 10deg
+    int max_vel_value = 1580;
     double velocity_value_buffer1 = 1550;
     double velocity_value_buffer2 = 1550;
 
-    double min_safe_distance = 0.5;	//Safety Distance to Car between 0deg and 65deg or 115deg and 180deg
-    double side_threshold = 1.4;//If an Obstacle is within this Distance in Side Area, Velocity is not adapted
-    double core_threshold = 1.8;//If an Obstacle is within this Distance in Core Area, Velocity is not adapted
-    int periphery_clear = 2;	//Velocity is only adapted if Periphery (between 0deg and 65deg or 115deg and 180deg in respect to min_safe_distance) is clear
+    double min_safe_distance = 0.5;
+    double side_threshold = 1.4; //1.4 (working relatively well)
+    double core_threshold = 1.8; //2.0
+    int periphery_clear = 2;
 
     if (initialization_counter != 45678)
     {
         //Initialization
-        ROS_INFO("INITIALISATION, initialisation_counter= %f", initialisation_counter);
+        ROS_INFO("INITIALIZATION, initialization_counter= %f", initialization_counter);
         for (int i = 0; i < 20;++i)
         {
             	velocity_value_old[i]=1550;
         }
-        initialisation_counter = 45678;
+        //ROS_INFO("INITIALIZATION, initialization_counter= %f", initialization_counter);
+        initialization_counter = 45678;
+        //ROS_INFO("INITIALIZATION done, initialization_counter= %f", initialization_counter);
+
     }
 
     periphery_clear = 1;
@@ -122,30 +123,32 @@ void control::LaserScan_Velocity_Calculation(const sensor_msgs::LaserScan::Const
         {
             if (i > (msg_mid_index + index_angle_delta_side))	//check of Periphery
             {
-                min_safe_distance = 0.3 + (1.1 * ((720.0-i)/(360.0 - index_angle_delta_side))); //Computation of min_safe_distance
+                min_safe_distance = 0.3 + (1.0 * ((720.0-i)/(360.0 - index_angle_delta_side)));
                 if (msg->ranges[i] <= min_safe_distance)
                 {
                     periphery_clear = 0;
+                    //ROS_INFO("min_safe_distance = %f, range = %f",min_safe_distance, msg->ranges[i]);
                 }
             }
-            else if ((i > (msg_mid_index + index_angle_delta_core))&&((i< (msg_mid_index + index_angle_delta_side))&&(min_range_sides > msg->ranges[i]))) // Right Side (btw. 105 and 115deg)
+            else if ((i > (msg_mid_index + index_angle_delta_core))&&((i< (msg_mid_index + index_angle_delta_side))&&(min_range_sides > msg->ranges[i]))) // Left
             {
                     min_range_sides = msg->ranges[i];
             }
-            else if ((i < (msg_mid_index + index_angle_delta_core))&&(i > (msg_mid_index - index_angle_delta_core))&&(msg->ranges[i] < min_range_core)) // Core (btw. 75 and 105deg)
+            else if ((i < (msg_mid_index + index_angle_delta_core))&&(i > (msg_mid_index - index_angle_delta_core))&&(msg->ranges[i] < min_range_core))
             {
                     min_range_core = msg->ranges[i];
             }
-            else if ((i < (msg_mid_index - index_angle_delta_core))&&(i> (msg_mid_index - index_angle_delta_side))&&(msg->ranges[i] < min_range_sides)) // Left Side (btw. 65 and 75deg)
+            else if ((i < (msg_mid_index - index_angle_delta_core))&&(i> (msg_mid_index - index_angle_delta_side))&&(msg->ranges[i] < min_range_sides))
             {
                     min_range_sides = msg->ranges[i];
             }
             else if (i < (msg_mid_index - index_angle_delta_side))	//check of Periphery
             {
-                min_safe_distance = 0.3 + (1.1 * (i/(360.0 - index_angle_delta_side)));
+                min_safe_distance = 0.3 + (1.0 * (i/(360.0 - index_angle_delta_side)));
                 if (msg->ranges[i] <= min_safe_distance)
                 {
                     periphery_clear = 0;
+                    //ROS_INFO("min_safe_distance = %f, range = %f",min_safe_distance, msg->ranges[i]);
                 }
             }
         }
@@ -156,22 +159,18 @@ void control::LaserScan_Velocity_Calculation(const sensor_msgs::LaserScan::Const
 
 	//Determination of maximum Velocity that guarantees safety of car
 
-	//If an Obstacle is immediately in front of the Car, it should not go on
-    	if ((min_range_core < 0.15)||(min_range_sides < 0.16)) //Immediate proximity to car
+        if ((min_range_core < (0.10))||(min_range_sides < (0.11))) //Immediate proximity to car(velocity_value - 1550)/100)
 	{
 		velocity_value_buffer1 = 1500;
 		ROS_INFO("Obstacle detected, distance < 15cm -> Braking");
 		velocity_value = 1500;
 		return;
 	}
-	//if there is no Obstacle within 4.8m in the core-area or 4.4m in the side areas and Periphery is also clear -> Full-Speed
     	else if ((min_range_core > (core_threshold + 3.0))&&(min_range_sides > (side_threshold + 3.0))&&(periphery_clear==1)) //No Obstacle near the car -> Full-Speed
 	{
 		velocity_value_buffer1 = max_vel_value;
-		ROS_INFO("No Obstacle detected in near proximity -> Full Speed");
+		ROS_INFO("No Obstacle within 5 meters -> Full Speed");
 	}
-	//if there is an obstacle between 1.8m and 4.8m (in the core area) or between 1.4m and 4.4m (in the side areas)
-	//and Periphery is clear -> adapt velocity seamlessly in respect to the closest obstacle
     	else if ((min_range_core > core_threshold)&&(min_range_sides > side_threshold)&&(periphery_clear==1)) //Obstacle far enough away to accelerate
 	{
 		if ((min_range_core - core_threshold) < (min_range_sides - side_threshold))
@@ -184,20 +183,21 @@ void control::LaserScan_Velocity_Calculation(const sensor_msgs::LaserScan::Const
 		}
         	double delta = (min_range/3.0) * (double(max_vel_value) - 1550);
        		velocity_value_buffer1 = 1550 + delta;
-        	ROS_INFO("Obstacle detected, distance not critical -> Adapting Speed");
+        	ROS_INFO("Obstacle detected, distance > 2m -> Adapting Speed");
 	}
-	//Else -> do not adapt speed and drive slowly
 	else
 	{
 		velocity_value_buffer1 = 1550;
 		ROS_INFO("Obstacle detected, distance < 2m -> Driving Slowly");
 	}
+    //ROS_INFO("Velocity_value_buffer1: %f", velocity_value_buffer1);
 
-	//Filter to avoid abrupt acceleration
+	//Filter
     velocity_value_buffer2 = velocity_value_buffer1;
-    for (int i = 0; i < 20; ++i)
+    for (int i = 0; i < 20; ++i) //sizeof(velocity_value_old)
 	{
         velocity_value_buffer2 += velocity_value_old[i];
+        //ROS_INFO("Velocity_value_buffer2: %f", velocity_value_buffer2);
 	}
     velocity_value = velocity_value_buffer2/21;
     ROS_INFO("Velocity_value: %f", velocity_value);
@@ -209,8 +209,7 @@ void control::LaserScan_Velocity_Calculation(const sensor_msgs::LaserScan::Const
         ROS_INFO("ERROR: computed invalid velocity_value");
 	}
 
-	// Shifting old velocity_values
-    for (int i=19; i > 0; --i)
+    for (int i=19; i > 0; --i) //sizeof(velocity_value_old)
 	{
 		velocity_value_old[i]=velocity_value_old[i-1];
 	}
